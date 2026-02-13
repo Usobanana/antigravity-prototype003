@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://bir4iosflvg8m"]
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_0rwas"]
+
+[node name="Player" type="CharacterBody2D" unique_id=1447057567]
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=108321858]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.96862745, 0.94509804, 0.81960785, 1)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=789387620]
+replication_config = SubResource("SceneReplicationConfig_0rwas")
