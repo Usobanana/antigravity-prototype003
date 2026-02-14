@@ -1,31 +1,32 @@
 extends Area2D
 
-const SPEED = 600.0
+var speed = 400.0
+var damage = 10
 
 func _ready():
-	# サーバー権限を持つピアのみが計算を行う
-	set_process(is_multiplayer_authority())
-	
-	# 画面外に出たら削除（サーバー側で実行されれば同期される）
-	if is_multiplayer_authority():
-		$VisibleOnScreenNotifier2D.screen_exited.connect(queue_free)
+	await get_tree().create_timer(3.0).timeout
+	queue_free()
 
-func _process(delta):
-	# 右方向へ進む（回転は生成時に設定される想定）
-	position += Vector2.RIGHT.rotated(rotation) * SPEED * delta
+func _physics_process(delta):
+	var direction = Vector2.RIGHT.rotated(rotation)
+	position += direction * speed * delta
 
 func _on_body_entered(body):
-	if not is_multiplayer_authority():
+	if not multiplayer.is_server():
 		return
-	
-	# 敵に当たった場合
+		
+	if body.has_method("hit") and not body.is_in_group("players"): # 自分以外（敵など）
+		# フレンドリーファイア防止はCollisionMaskでやるのが基本だが、
+		# ここでは簡易的にグループで判定
+		pass
+		
 	if body.is_in_group("enemies"):
-		if body.has_method("hit"):
-			# サーバー同士なので直接呼んでも良いが、念のためRPC経由または直接呼び出し
-			# ここでは直接関数を叩く（サーバー権限内なので）
-			body.hit(1)
+		body.hit(damage)
 		queue_free()
-	# 他の物体（壁など）に当たった場合も消える
+	elif body.is_in_group("players"):
+		# PvPはなし？ありならここでhit
+		# 今回はなしとする
+		pass
 	else:
 		if body.is_in_group("players"):
 			return

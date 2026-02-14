@@ -43,3 +43,11 @@ enabled = false
 position_smoothing_enabled = true
 drag_horizontal_enabled = true
 drag_vertical_enabled = true
+
+[node name="ReloadBar" type="ProgressBar" parent="."]
+visible = false
+offset_left = -25.0
+offset_top = -40.0
+offset_right = 25.0
+offset_bottom = -35.0
+show_percentage = false

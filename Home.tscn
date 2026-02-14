@@ -1,57 +1,365 @@
-[gd_scene load_steps=2 format=3 uid="uid://home_scene_id"]
+[gd_scene load_steps=8 format=3 uid="uid://home_scene_id"]
 
 [ext_resource type="Script" path="res://Home.gd" id="1_home"]
+[ext_resource type="PackedScene" uid="uid://bir4iosflvg8m" path="res://Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://UI.tscn" id="3_ui"]
 
-[node name="Home" type="Control"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
+size = Vector2(1200, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lab"]
+size = Vector2(150, 150)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_armory"]
+size = Vector2(150, 150)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gate"]
+size = Vector2(200, 100)
+
+[node name="Home" type="Node2D"]
+script = ExtResource("1_home")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 1000.0
+offset_bottom = 1000.0
+color = Color(0.18, 0.16, 0.14, 1)
+
+[node name="WarmLight" type="PointLight2D" parent="."]
+position = Vector2(0, 0)
+scale = Vector2(20, 20)
+color = Color(1, 0.8, 0.6, 1)
+energy = 0.5
+texture_scale = 1.0
+
+[node name="Walls" type="StaticBody2D" parent="."]
+
+[node name="Top" type="CollisionShape2D" parent="Walls"]
+position = Vector2(0, -400)
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Bottom" type="CollisionShape2D" parent="Walls"]
+position = Vector2(0, 400)
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Left" type="CollisionShape2D" parent="Walls"]
+position = Vector2(-600, 0)
+rotation = 1.5708
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Right" type="CollisionShape2D" parent="Walls"]
+position = Vector2(600, 0)
+rotation = 1.5708
+shape = SubResource("RectangleShape2D_wall")
+
+[node name="Facilities" type="Node2D" parent="."]
+
+[node name="Laboratory" type="Area2D" parent="Facilities"]
+position = Vector2(-400, 0)
+
+[node name="ColorRect" type="ColorRect" parent="Facilities/Laboratory"]
+offset_left = -75.0
+offset_top = -75.0
+offset_right = 75.0
+offset_bottom = 75.0
+color = Color(0.2, 0.6, 0.8, 0.0)
+
+[node name="Label" type="Label" parent="Facilities/Laboratory"]
+offset_left = -50.0
+offset_top = -50.0
+offset_right = 50.0
+offset_bottom = -24.0
+text = "LAB"
+horizontal_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Facilities/Laboratory"]
+shape = SubResource("RectangleShape2D_lab")
+
+[node name="Indicator" type="Label" parent="Facilities/Laboratory"]
+visible = false
+offset_left = -10.0
+offset_top = -100.0
+offset_right = 10.0
+offset_bottom = -60.0
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "!"
+
+[node name="Armory" type="Area2D" parent="Facilities"]
+position = Vector2(400, 0)
+
+[node name="ColorRect" type="ColorRect" parent="Facilities/Armory"]
+offset_left = -75.0
+offset_top = -75.0
+offset_right = 75.0
+offset_bottom = 75.0
+color = Color(0.8, 0.2, 0.2, 0.0)
+
+[node name="Label" type="Label" parent="Facilities/Armory"]
+offset_left = -50.0
+offset_top = -50.0
+offset_right = 50.0
+offset_bottom = -24.0
+text = "ARMORY"
+horizontal_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Facilities/Armory"]
+shape = SubResource("RectangleShape2D_armory")
+
+[node name="Indicator" type="Label" parent="Facilities/Armory"]
+visible = false
+offset_left = -10.0
+offset_top = -100.0
+offset_right = 10.0
+offset_bottom = -60.0
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "!"
+
+[node name="MissionGate" type="Area2D" parent="Facilities"]
+position = Vector2(0, -300)
+
+[node name="ColorRect" type="ColorRect" parent="Facilities/MissionGate"]
+offset_left = -100.0
+offset_top = -50.0
+offset_right = 100.0
+offset_bottom = 50.0
+color = Color(0.2, 0.8, 0.2, 0.0)
+
+[node name="Label" type="Label" parent="Facilities/MissionGate"]
+offset_left = -50.0
+offset_top = -20.0
+offset_right = 50.0
+offset_bottom = 6.0
+text = "GATE"
+horizontal_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Facilities/MissionGate"]
+shape = SubResource("RectangleShape2D_gate")
+
+[node name="Indicator" type="Label" parent="Facilities/MissionGate"]
+visible = false
+offset_left = -10.0
+offset_top = -100.0
+offset_right = 10.0
+offset_bottom = -60.0
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+theme_override_font_sizes/font_size = 32
+text = "!"
+
+
+[node name="UI" parent="." instance=ExtResource("3_ui")]
+
+[node name="Header" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 60.0
+grow_horizontal = 2
+
+[node name="NetworkStatus" type="Label" parent="UI/Header"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 300.0
+offset_bottom = 36.0
+text = "Status: Connecting..."
+
+[node name="MaterialsLabel" type="Label" parent="UI/Header"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 10.0
+offset_right = -20.0
+offset_bottom = 36.0
+grow_horizontal = 0
+text = "Materials: 0"
+horizontal_alignment = 2
+
+[node name="InteractionPanel" type="Panel" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI/InteractionPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 40.0
+grow_horizontal = 2
+text = "Facility Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Description" type="Label" parent="UI/InteractionPanel"]
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -40.0
+offset_bottom = 40.0
+grow_horizontal = 2
+text = "Upgrade?"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ActionBtn" type="Button" parent="UI/InteractionPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -80.0
+offset_top = -60.0
+offset_right = 80.0
+offset_bottom = -20.0
+grow_horizontal = 2
+text = "Action"
+
+[node name="CloseBtn" type="Button" parent="UI/InteractionPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -40.0
+offset_bottom = 40.0
+grow_horizontal = 0
+text = "X"
+
+[connection signal="body_entered" from="Facilities/Laboratory" to="." method="_on_lab_entered"]
+[connection signal="body_exited" from="Facilities/Laboratory" to="." method="_on_lab_exited"]
+[connection signal="body_entered" from="Facilities/Armory" to="." method="_on_armory_entered"]
+[connection signal="body_exited" from="Facilities/Armory" to="." method="_on_armory_exited"]
+[connection signal="body_entered" from="Facilities/MissionGate" to="." method="_on_gate_entered"]
+[connection signal="body_exited" from="Facilities/MissionGate" to="." method="_on_gate_exited"]
+[node name="LabUI" type="Control" parent="UI"]
+visible = false
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_home")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="Panel" type="Panel" parent="UI/LabUI"]
 layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="UI/LabUI/Panel"]
+layout_mode = 0
+offset_right = 500.0
+offset_bottom = 50.0
+text = "LABORATORY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/LabUI/Panel"]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 60.0
+offset_right = 475.0
+offset_bottom = 340.0
+theme_override_constants/separation = 20
+
+[node name="WeightUpgrade" type="HBoxContainer" parent="UI/LabUI/Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Info" type="Label" parent="UI/LabUI/Panel/VBoxContainer/WeightUpgrade"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Max Weight: 10 -> 12"
+
+[node name="Button" type="Button" parent="UI/LabUI/Panel/VBoxContainer/WeightUpgrade"]
+layout_mode = 2
+text = "Upgrade (100)"
+
+[node name="HPUpgrade" type="HBoxContainer" parent="UI/LabUI/Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Info" type="Label" parent="UI/LabUI/Panel/VBoxContainer/HPUpgrade"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Max HP: 100 -> 120"
+
+[node name="Button" type="Button" parent="UI/LabUI/Panel/VBoxContainer/HPUpgrade"]
+layout_mode = 2
+text = "Upgrade (100)"
+
+[node name="CloseBtn" type="Button" parent="UI/LabUI/Panel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -40.0
+offset_bottom = 40.0
+grow_horizontal = 0
+text = "X"
+
+[node name="ArmoryUI" type="Control" parent="UI"]
+visible = false
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.15, 0.15, 0.25, 1)
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="Panel" type="Panel" parent="UI/ArmoryUI"]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -100.0
-offset_right = 300.0
-offset_bottom = -50.0
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 24
-text = "Status: Connecting..."
+
+[node name="Label" type="Label" parent="UI/ArmoryUI/Panel"]
+layout_mode = 0
+offset_right = 400.0
+offset_bottom = 40.0
+text = "ARMORY"
 horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="BattleButton" type="Button" parent="."]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -150.0
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/ArmoryUI/Panel"]
+layout_mode = 0
+offset_left = 20.0
 offset_top = 50.0
-offset_right = 150.0
-offset_bottom = 130.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 40
-disabled = true
-text = "BATTLE"
+offset_right = 380.0
+offset_bottom = 280.0
 
-[connection signal="pressed" from="BattleButton" to="." method="_on_battle_button_pressed"]
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/ArmoryUI/Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+[connection signal="pressed" from="UI/InteractionPanel/ActionBtn" to="." method="_on_action_btn_pressed"]
+[connection signal="pressed" from="UI/InteractionPanel/CloseBtn" to="." method="_on_close_btn_pressed"]

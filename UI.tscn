@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://uicontrol001"]
 
-[ext_resource type="PackedScene" uid="uid://bteyn0hwlalqe" path="res://VirtualJoystick.tscn" id="1_joystick"]
+[ext_resource type="PackedScene" path="res://VirtualJoystick.tscn" id="1_joystick"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_bg"]
 bg_color = Color(0.2, 0.2, 0.2, 0.8)
@@ -73,3 +73,62 @@ offset_right = -150.0
 offset_bottom = -150.0
 grow_horizontal = 0
 grow_vertical = 0
+
+[node name="WeaponHUD" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 160.0
+offset_top = -70.0
+offset_right = 360.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Background" type="ColorRect" parent="WeaponHUD"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="Icon" type="ColorRect" parent="WeaponHUD"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 45.0
+offset_bottom = 45.0
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="NameLabel" type="Label" parent="WeaponHUD"]
+layout_mode = 0
+offset_left = 55.0
+offset_top = 5.0
+offset_right = 195.0
+offset_bottom = 28.0
+text = "Pistol"
+
+[node name="AmmoLabel" type="Label" parent="WeaponHUD"]
+layout_mode = 0
+offset_left = 55.0
+offset_top = 25.0
+offset_right = 195.0
+offset_bottom = 48.0
+text = "12 / 12"
+
+[node name="ReloadBar" type="ProgressBar" parent="WeaponHUD"]
+visible = false
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+show_percentage = false

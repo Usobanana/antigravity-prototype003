@@ -30,6 +30,7 @@ func _ready():
 		multiplayer.peer_connected.connect(_spawn_player)
 		multiplayer.peer_disconnected.connect(_remove_player)
 
+
 	# 自身（Host含む）のロード完了を通知
 	rpc_id(1, "_on_player_scene_ready")
 
@@ -68,7 +69,15 @@ func _spawn_player(id):
 		
 	var player = player_scene.instantiate()
 	player.name = str(id)
-	add_child(player, true) # trueで自動同期（MultiplayerSpawnerがルートにあればだが、ここでは手動add_childなのでSpawner設定次第）
+	
+	# スポーン位置を分散させる（ベース: 576, 324）
+	var center = Vector2(576, 324)
+	var radius = 100.0
+	var angle = randf() * TAU
+	var offset = Vector2(cos(angle), sin(angle)) * radius
+	player.position = center + offset
+	
+	add_child(player, true) # trueで自動同期
 	# 今回の構成ではPlayers用のSpawnerがないため、add_childの第2引数trueだけでは同期されない可能性がある
 	# しかし、main.tscnの末尾に `MultiplayerSpawner` (spawn_path="..") があるので、ルート直下へのaddは同期されるはず
 
@@ -86,50 +95,44 @@ func _spawn_enemy():
 	$Enemies.add_child(enemy, true)
 
 # 弾を発射する関数
+# 弾を発射する関数
 @rpc("any_peer", "call_local")
-func fire_bullet(pos, rot):
+func fire_bullet(pos, rot, speed=400.0, damage=10):
 	var bullet = bullet_scene.instantiate()
 	bullet.global_position = pos
 	bullet.rotation = rot
+	bullet.speed = speed
+	bullet.damage = damage
 	$Projectiles.add_child(bullet, true)
 
-func _on_item_spawn_timer_timeout():
-	if not multiplayer.is_server():
-		return
-	if $Items.get_child_count() >= 20:
-		return
-		
-	var item = item_scene.instantiate()
-	var screen_size = Vector2(1152, 648)
-	item.position = Vector2(randf_range(50, screen_size.x - 50), randf_range(50, screen_size.y - 50))
-	if item.position.distance_to(Vector2(576, 324)) < 150:
-		return
-	$Items.add_child(item, true)
-
-@rpc("any_peer", "call_local")
-func remove_item(item_path):
-	if not multiplayer.is_server():
-		return
-	var item = get_node_or_null(item_path)
-	if item:
-		item.queue_free()
-
-@rpc("any_peer", "call_local")
-func drop_items(pos, count):
-	if not multiplayer.is_server():
-		return
-	for i in range(count):
-		var item = item_scene.instantiate()
-		var offset = Vector2(randf_range(-30, 30), randf_range(-30, 30))
-		item.global_position = pos + offset
-		$Items.add_child(item, true)
-
-# Base納品処理
+	# Base納品処理
 func _on_base_body_entered(body):
 	if not multiplayer.is_server():
 		return
 		
 	if body.is_in_group("players"):
+		# 武器ボックスを持っているかチェック（held_itemsの仕組みとは別に管理するか、
+		# もしくはpickup時に判別フラグを持たせるか。今回は簡易的にpickup時に即時判定せず、
+		# 納品時に持っているアイテムの種類をチェックする必要があるが、
+		# 現在のpickup実装は単に数をカウントしているだけ。
+		# -> WeaponBoxはPickup時に「持ってるフラグ」をPlayerに立てるか、
+		#    あるいはWeaponBox自体をPlayerの子ノードとして物理的に持たせるのが本来だが、
+		#    今回は「held_items」カウント方式なので、WeaponBoxを拾った瞬間にフラグを立てる方式にする。
+		#    ただし、Playerスクリプトの改修が必要。
+		#    
+		#    代替案：WeaponBoxを拾うと、その場で「WeaponBoxアイテム」としてカウントしつつ、
+		#    Player側に「weapon_box_held = true」みたいなフラグを立てる。
+		
+		# Playerスクリプト改修前なので、ここでは「スコアによる納品」とは別に、
+		# 「武器ボックスを持っているなら解禁」という処理を入れる。
+		# そのためにPlayer.gdに `has_weapon_box` フラグを追加する必要がある。
+		
+		if "has_weapon_box" in body and body.has_weapon_box:
+			# 武器解禁通知（RPC）
+			body.rpc("unlock_weapon", "smg") # 今回はSMG固定
+			body.has_weapon_box = false
+			print("Weapon Unlocked: SMG for ", body.name)
+			
 		if "held_items" in body and body.held_items > 0:
 			var points = body.held_items * 100
 			body.rpc("add_score", points)
@@ -138,15 +141,35 @@ func _on_base_body_entered(body):
 			body.rpc("reset_carry")
 			rpc("spawn_delivery_effect", body.global_position)
 			
-			# ゲーム終了判定 (今回は簡易的にサーバー側でスコア計算していないので、クライアントのスコアを信じるか、
-			# 本来はサーバーで各プレイヤーのスコアを管理すべき)
-			# ここでは簡易的に「納品後のスコアが500以上なら終了」とする
-			# body.score は同期前の値なので + points する
+			# ゲーム終了判定
 			if body.score + points >= 500:
 				print("Game Over! Winner: ", body.name)
-				# 全員をリザルトへ (スコアを渡す)
-				# RPCで全員に通知し、NetworkManagerにスコアを保存させてから遷移
 				rpc("game_over", body.score + points)
+
+# 武器ボックスのスポーン（敵死亡時やランダムなど）
+# 今回はItemTimerで稀に出現させる
+func _on_item_spawn_timer_timeout():
+	if not multiplayer.is_server():
+		return
+	if $Items.get_child_count() >= 20:
+		return
+		
+	# 10%の確率で武器ボックス
+	var is_weapon_box = randf() < 0.1
+	var item
+	
+	if is_weapon_box:
+		# WeaponBox シーンをロード（変数定義が必要）
+		var weapon_box_scene = load("res://WeaponBox.tscn")
+		item = weapon_box_scene.instantiate()
+	else:
+		item = item_scene.instantiate()
+		
+	var screen_size = Vector2(1152, 648)
+	item.position = Vector2(randf_range(50, screen_size.x - 50), randf_range(50, screen_size.y - 50))
+	if item.position.distance_to(Vector2(576, 324)) < 150:
+		return
+	$Items.add_child(item, true)
 
 @rpc("call_local")
 func game_over(final_score):
@@ -176,3 +199,24 @@ func spawn_delivery_effect(pos):
 	timer.one_shot = true
 	timer.timeout.connect(func(): particle.queue_free(); timer.queue_free())
 	add_child(timer)
+
+@rpc("call_local")
+func drop_items(pos, amount):
+	if not multiplayer.is_server():
+		return
+		
+	for i in range(amount):
+		var item = item_scene.instantiate()
+		# 少し散らばらせる
+		var offset = Vector2(randf_range(-30, 30), randf_range(-30, 30))
+		item.global_position = pos + offset
+		$Items.add_child(item, true) # Spawnerが監視しているのはItemsノード
+
+@rpc("any_peer", "call_local")
+func remove_item(item_path):
+	if not multiplayer.is_server():
+		return
+		
+	var item_node = get_node_or_null(item_path)
+	if item_node:
+		item_node.queue_free()

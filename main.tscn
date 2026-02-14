@@ -34,7 +34,7 @@ spawn_path = NodePath("../Enemies")
 [node name="Items" type="Node" parent="." unique_id=555555555]
 
 [node name="ItemSpawner" type="MultiplayerSpawner" parent="." unique_id=666666666]
-_spawnable_scenes = PackedStringArray("res://Item.tscn")
+_spawnable_scenes = PackedStringArray("res://Item.tscn", "res://WeaponBox.tscn")
 spawn_path = NodePath("../Items")
 
 [node name="Base" type="Area2D" parent="."]
@@ -54,7 +54,7 @@ shape = SubResource("RectangleShape2D_base")
 [node name="UI" parent="." instance=ExtResource("2_ui")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1067625345]
-_spawnable_scenes = PackedStringArray("uid://bir4iosflvg8m")
+_spawnable_scenes = PackedStringArray("res://Player.tscn")
 spawn_path = NodePath("..")
 
 [connection signal="body_entered" from="Base" to="." method="_on_base_body_entered"]
