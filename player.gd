@@ -7,8 +7,8 @@ func _enter_tree():
 	add_to_group("players")
 	
 	# このプレイヤーが「自分」のものか、ネットワークIDで判定
-	# 名前をIDにしているので、名前が自分のIDと一致するか確認します
-	set_multiplayer_authority(name.to_int())
+	var id = name.to_int()
+	set_multiplayer_authority(id)
 
 # カメラ設定
 @export var camera_smoothing_speed : float = 20.0

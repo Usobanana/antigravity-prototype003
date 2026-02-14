@@ -1,7 +1,10 @@
 extends Node
 
 const PORT = 7000
-const DEFAULT_SERVER_IP = "127.0.0.1"
+var server_ip = "127.0.0.1"
+
+const CERT_FILE = "res://server.pem"
+const KEY_FILE = "res://key.pem"
 
 signal connection_established
 signal game_started
@@ -13,6 +16,13 @@ var players = {}
 var last_score = 0
 
 func _ready():
+	# Web版の場合、ブラウザのURL（ホスト名）をサーバーIPとして採用する
+	if OS.has_feature("web"):
+		var hostname = JavaScriptBridge.eval("window.location.hostname")
+		if hostname and hostname != "":
+			server_ip = hostname
+			print("Web environment detected. Server IP set to: ", server_ip)
+	
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -21,26 +31,52 @@ func _ready():
 
 # 自動接続ロジック（クライアントとして試行 -> 失敗ならホスト）
 func try_auto_connect():
-	print("Auto-connecting...")
+	print("Auto-connecting to ", server_ip, ":", PORT)
 	peer = WebSocketMultiplayerPeer.new()
-	var error = peer.create_client("ws://" + DEFAULT_SERVER_IP + ":" + str(PORT))
+	
+	# Web版はHTTPSで配信されているため、WSS (Secure WebSocket) 必須
+	# 自己署名証明書のため verify_unsafe を使用
+	var url = "wss://" + server_ip + ":" + str(PORT)
+	var tls_options = TLSOptions.client_unsafe()
+	
+	var error = peer.create_client(url, tls_options)
 	if error != OK:
-		print("Client creation failed, starting as host.")
-		start_host()
+		print("Client creation failed.")
+		_try_start_host()
 		return
 	
 	multiplayer.multiplayer_peer = peer
-	
-	# 接続タイムアウト監視（簡易的）
-	# 実際には connection_failed が呼ばれるのを待つが、
-	# WebSocketの場合、サーバーがいなければ即座に切断されるか、タイムアウトする
-	# ここでは少し待って繋がらなければホストになるタイマーを仕掛ける手もあるが
-	# GodotのWebSocketは接続できないと割とすぐに connection_failed か closed になる
-	
-func start_host():
+
+func _try_start_host():
+	# Webエクスポートではサーバーになれないため、ホスト起動はスキップ
+	if OS.has_feature("web"):
+		print("Cannot host on Web platform.")
+		return
+
 	print("Starting as Host...")
 	peer = WebSocketMultiplayerPeer.new()
-	peer.create_server(PORT)
+	
+	# サーバー側も証明書を読み込んで WSS 対応にする
+	var tls_options = null
+	if FileAccess.file_exists(CERT_FILE) and FileAccess.file_exists(KEY_FILE):
+		var cert = X509Certificate.new()
+		var err_cert = cert.load(CERT_FILE)
+		var key = CryptoKey.new()
+		var err_key = key.load(KEY_FILE)
+		
+		if err_cert == OK and err_key == OK:
+			tls_options = TLSOptions.server(key, cert)
+			print("WSS (Secure) mode enabled for Host.")
+		else:
+			print("Failed to load certificates. Falling back to WS (Insecure).")
+	else:
+		print("Certificates not found. Falling back to WS (Insecure).")
+
+	var err = peer.create_server(PORT, "*", tls_options)
+	if err != OK:
+		print("Failed to create server: ", err)
+		return
+		
 	multiplayer.multiplayer_peer = peer
 	_on_connected_to_server() # ホスト自身も準備完了扱い
 	
@@ -60,7 +96,7 @@ func _on_connected_to_server():
 func _on_connection_failed():
 	print("Connection failed. Switching to Host mode...")
 	multiplayer.multiplayer_peer = null
-	start_host()
+	_try_start_host()
 
 func _on_server_disconnected():
 	print("Server disconnected")

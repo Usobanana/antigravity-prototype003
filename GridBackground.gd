@@ -20,8 +20,8 @@ func _draw():
 		var color = LINE_COLOR
 		var width = LINE_WIDTH
 		
-		# 太線判定 (0を含む座標がグリッドサイズの倍数で割り切れるか)
-		if int(x / GRID_SIZE) % MAJOR_LINE_INTERVAL == 0:
+		# 太線判定 (Major Line Interval)
+		if x % (GRID_SIZE * MAJOR_LINE_INTERVAL) == 0:
 			color = MAJOR_LINE_COLOR
 			width = MAJOR_LINE_WIDTH
 			
@@ -32,7 +32,7 @@ func _draw():
 		var color = LINE_COLOR
 		var width = LINE_WIDTH
 		
-		if int(y / GRID_SIZE) % MAJOR_LINE_INTERVAL == 0:
+		if y % (GRID_SIZE * MAJOR_LINE_INTERVAL) == 0:
 			color = MAJOR_LINE_COLOR
 			width = MAJOR_LINE_WIDTH
 			

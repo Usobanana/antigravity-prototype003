@@ -26,18 +26,41 @@ func _ready():
 		item_timer.timeout.connect(_on_item_spawn_timer_timeout)
 		add_child(item_timer)
 		
-		# 自分のプレイヤー生成
-		_spawn_player(1)
-		
-		# 接続済みクライアントのプレイヤー生成（もし同期ズレで生成されていなければ）
-		for id in multiplayer.get_peers():
-			_spawn_player(id)
-			
-		# 新規接続時にも生成
+		# 新規接続・切断時の処理（途中参加用）
 		multiplayer.peer_connected.connect(_spawn_player)
 		multiplayer.peer_disconnected.connect(_remove_player)
 
+	# 自身（Host含む）のロード完了を通知
+	rpc_id(1, "_on_player_scene_ready")
+
+# 全員（または該当プレイヤー）がシーン読み込み完了したらスポーンさせる
+var ready_players_count = 0
+
+@rpc("any_peer", "call_local")
+func _on_player_scene_ready():
+	if not multiplayer.is_server():
+		return
+		
+	ready_players_count += 1
+	var total_players = multiplayer.get_peers().size() + 1
+	print("Player ready: ", ready_players_count, "/", total_players)
+	
+	# 今回は「全員揃ったら一斉スタート」方式を採用
+	# ※途中参加を考慮するなら、個別にスポーンさせるロジックにするが、
+	#   Title->Home->Battleのフローでは一斉開始が自然
+	if ready_players_count >= total_players:
+		print("All players ready. Spawning...")
+		_spawn_initial_players()
+
+func _spawn_initial_players():
+	_spawn_player(1)
+	for id in multiplayer.get_peers():
+		_spawn_player(id)
+
 func _spawn_player(id):
+	# 既に存在するかチェック（重複防止）
+	if has_node(str(id)):
+		return
 	print("Spawning player: ", id)
 	# 既に存在するかチェック
 	if has_node(str(id)):
