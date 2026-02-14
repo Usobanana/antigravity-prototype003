@@ -11,9 +11,13 @@ config_version=5
 [application]
 
 config/name="antigravity-prototype003"
-run/main_scene="uid://bc4lm6557ad3v"
+run/main_scene="res://Title.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
+
+[autoload]
+
+NetworkManager="*res://NetworkManager.gd"
 
 [display]
 

@@ -1,27 +1,60 @@
 [gd_scene format=3 uid="uid://bc4lm6557ad3v"]
 
 [ext_resource type="Script" uid="uid://47euvibq7h1u" path="res://main.gd" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://UI.tscn" id="2_ui"]
+
+[ext_resource type="Script" path="res://GridBackground.gd" id="3_grid"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_base"]
+size = Vector2(100, 100)
 
 [node name="Main" type="Node2D" unique_id=899120281]
 script = ExtResource("1_ig7tw")
 
-[node name="HostButton" type="Button" parent="." unique_id=1492020445]
-offset_left = 701.0
-offset_top = 269.0
-offset_right = 745.0
-offset_bottom = 300.0
-text = "Host"
+[node name="BackgroundLayer" type="CanvasLayer" parent="."]
+layer = -100
+follow_viewport_enabled = true
 
-[node name="JoinButton" type="Button" parent="." unique_id=1266550448]
-offset_left = 496.0
-offset_top = 270.0
-offset_right = 534.0
-offset_bottom = 301.0
-text = "Join"
+[node name="Grid" type="Node2D" parent="BackgroundLayer"]
+script = ExtResource("3_grid")
 
-[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1067625345]
+
+[node name="Projectiles" type="Node" parent="." unique_id=111111111]
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=222222222]
+_spawnable_scenes = PackedStringArray("res://Bullet.tscn")
+spawn_path = NodePath("../Projectiles")
+
+[node name="Enemies" type="Node" parent="." unique_id=333333333]
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="." unique_id=444444444]
+_spawnable_scenes = PackedStringArray("res://Enemy.tscn")
+spawn_path = NodePath("../Enemies")
+
+[node name="Items" type="Node" parent="." unique_id=555555555]
+
+[node name="ItemSpawner" type="MultiplayerSpawner" parent="." unique_id=666666666]
+_spawnable_scenes = PackedStringArray("res://Item.tscn")
+spawn_path = NodePath("../Items")
+
+[node name="Base" type="Area2D" parent="."]
+position = Vector2(576, 324)
+monitorable = false
+
+[node name="ColorRect" type="ColorRect" parent="Base"]
+offset_left = -50.0
+offset_top = -50.0
+offset_right = 50.0
+offset_bottom = 50.0
+color = Color(1, 0.8, 0, 0.3)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Base"]
+shape = SubResource("RectangleShape2D_base")
+
+[node name="UI" parent="." instance=ExtResource("2_ui")]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1067625345]
 _spawnable_scenes = PackedStringArray("uid://bir4iosflvg8m")
 spawn_path = NodePath("..")
 
-[connection signal="pressed" from="HostButton" to="." method="_on_host_button_pressed"]
-[connection signal="pressed" from="JoinButton" to="." method="_on_join_button_pressed"]
+[connection signal="body_entered" from="Base" to="." method="_on_base_body_entered"]

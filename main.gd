@@ -4,38 +4,152 @@ const PORT = 7000
 const DEFAULT_SERVER_IP = "127.0.0.1"
 # プレイヤーの設計図を読み込んでおく
 @export var player_scene: PackedScene = preload("res://Player.tscn")
+@export var bullet_scene: PackedScene = preload("res://Bullet.tscn")
+@export var enemy_scene: PackedScene = preload("res://Enemy.tscn")
+@export var item_scene: PackedScene = preload("res://Item.tscn")
 
 func _ready():
-	print("スクリプトが起動しました！")
-
-func _on_host_button_pressed():
-	print("Hostボタンが押されました")
-	var peer = ENetMultiplayerPeer.new()
-	peer.create_server(PORT)
-	multiplayer.multiplayer_peer = peer
+	print("Main Scene Started")
 	
-	# ホスト自身のプレイヤーを作成
-	_add_player(1)
-	
-	# 新しい誰かが接続してきたら _add_player 関数を呼ぶ
-	multiplayer.peer_connected.connect(_add_player)
-	_hide_ui()
+	# ホストの場合のみ、ゲーム初期化処理
+	if multiplayer.is_server():
+		# 敵・アイテム生成タイマー開始
+		var enemy_timer = Timer.new()
+		enemy_timer.wait_time = 3.0
+		enemy_timer.autostart = true
+		enemy_timer.timeout.connect(_on_enemy_spawn_timer_timeout)
+		add_child(enemy_timer)
 
-func _on_join_button_pressed():
-	print("Joinボタンが押されました")
-	var peer = ENetMultiplayerPeer.new()
-	peer.create_client(DEFAULT_SERVER_IP, PORT)
-	multiplayer.multiplayer_peer = peer
-	_hide_ui()
+		var item_timer = Timer.new()
+		item_timer.wait_time = 2.0
+		item_timer.autostart = true
+		item_timer.timeout.connect(_on_item_spawn_timer_timeout)
+		add_child(item_timer)
+		
+		# 自分のプレイヤー生成
+		_spawn_player(1)
+		
+		# 接続済みクライアントのプレイヤー生成（もし同期ズレで生成されていなければ）
+		for id in multiplayer.get_peers():
+			_spawn_player(id)
+			
+		# 新規接続時にも生成
+		multiplayer.peer_connected.connect(_spawn_player)
+		multiplayer.peer_disconnected.connect(_remove_player)
 
-# プレイヤーを作成して画面に出す関数
-func _add_player(id):
-	print("プレイヤー追加: ", id)
+func _spawn_player(id):
+	print("Spawning player: ", id)
+	# 既に存在するかチェック
+	if has_node(str(id)):
+		return
+		
 	var player = player_scene.instantiate()
-	player.name = str(id) # 名前をネットワークIDにして区別する
-	add_child(player)
+	player.name = str(id)
+	add_child(player, true) # trueで自動同期（MultiplayerSpawnerがルートにあればだが、ここでは手動add_childなのでSpawner設定次第）
+	# 今回の構成ではPlayers用のSpawnerがないため、add_childの第2引数trueだけでは同期されない可能性がある
+	# しかし、main.tscnの末尾に `MultiplayerSpawner` (spawn_path="..") があるので、ルート直下へのaddは同期されるはず
 
-func _hide_ui():
-	print("UIを非表示にします")
-	$HostButton.hide()
-	$JoinButton.hide()
+func _remove_player(id):
+	if has_node(str(id)):
+		get_node(str(id)).queue_free()
+
+func _on_enemy_spawn_timer_timeout():
+	_spawn_enemy()
+
+func _spawn_enemy():
+	var enemy = enemy_scene.instantiate()
+	var screen_size = Vector2(1152, 648) # 簡易
+	enemy.global_position = Vector2(randf() * screen_size.x, randf() * screen_size.y)
+	$Enemies.add_child(enemy, true)
+
+# 弾を発射する関数
+@rpc("any_peer", "call_local")
+func fire_bullet(pos, rot):
+	var bullet = bullet_scene.instantiate()
+	bullet.global_position = pos
+	bullet.rotation = rot
+	$Projectiles.add_child(bullet, true)
+
+func _on_item_spawn_timer_timeout():
+	if not multiplayer.is_server():
+		return
+	if $Items.get_child_count() >= 20:
+		return
+		
+	var item = item_scene.instantiate()
+	var screen_size = Vector2(1152, 648)
+	item.position = Vector2(randf_range(50, screen_size.x - 50), randf_range(50, screen_size.y - 50))
+	if item.position.distance_to(Vector2(576, 324)) < 150:
+		return
+	$Items.add_child(item, true)
+
+@rpc("any_peer", "call_local")
+func remove_item(item_path):
+	if not multiplayer.is_server():
+		return
+	var item = get_node_or_null(item_path)
+	if item:
+		item.queue_free()
+
+@rpc("any_peer", "call_local")
+func drop_items(pos, count):
+	if not multiplayer.is_server():
+		return
+	for i in range(count):
+		var item = item_scene.instantiate()
+		var offset = Vector2(randf_range(-30, 30), randf_range(-30, 30))
+		item.global_position = pos + offset
+		$Items.add_child(item, true)
+
+# Base納品処理
+func _on_base_body_entered(body):
+	if not multiplayer.is_server():
+		return
+		
+	if body.is_in_group("players"):
+		if "held_items" in body and body.held_items > 0:
+			var points = body.held_items * 100
+			body.rpc("add_score", points)
+			print("Delivered! Score:", body.score + points)
+			
+			body.rpc("reset_carry")
+			rpc("spawn_delivery_effect", body.global_position)
+			
+			# ゲーム終了判定 (今回は簡易的にサーバー側でスコア計算していないので、クライアントのスコアを信じるか、
+			# 本来はサーバーで各プレイヤーのスコアを管理すべき)
+			# ここでは簡易的に「納品後のスコアが500以上なら終了」とする
+			# body.score は同期前の値なので + points する
+			if body.score + points >= 500:
+				print("Game Over! Winner: ", body.name)
+				# 全員をリザルトへ (スコアを渡す)
+				# RPCで全員に通知し、NetworkManagerにスコアを保存させてから遷移
+				rpc("game_over", body.score + points)
+
+@rpc("call_local")
+func game_over(final_score):
+	NetworkManager.last_score = final_score
+	NetworkManager.end_game()
+
+@rpc("call_local")
+func spawn_delivery_effect(pos):
+	var particle = CPUParticles2D.new()
+	particle.global_position = pos
+	particle.emitting = true
+	particle.amount = 20
+	particle.one_shot = true
+	particle.explosiveness = 1.0
+	particle.spread = 180.0
+	particle.gravity = Vector2(0, 0)
+	particle.initial_velocity_min = 100.0
+	particle.initial_velocity_max = 200.0
+	particle.scale_amount_min = 3.0
+	particle.scale_amount_max = 5.0
+	particle.color = Color(1, 1, 0) # 黄色
+	add_child(particle)
+	
+	var timer = Timer.new()
+	timer.wait_time = 2.0
+	timer.autostart = true
+	timer.one_shot = true
+	timer.timeout.connect(func(): particle.queue_free(); timer.queue_free())
+	add_child(timer)
