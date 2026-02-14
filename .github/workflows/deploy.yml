@@ -21,7 +21,7 @@ jobs:
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v1
         with:
-          version: 4.3 # Adjust to match your project version
+          version: 4.3.0 # Full semantic version required
           use-dotnet: false
 
       - name: Export Web Build
