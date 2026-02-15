@@ -29,14 +29,23 @@ func _ready():
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
+# 接続先URL（空の場合は自動検出/ローカル）
+var target_url = ""
+
 # 自動接続ロジック（クライアントとして試行 -> 失敗ならホスト）
 func try_auto_connect():
-	print("Auto-connecting to ", server_ip, ":", PORT)
-	peer = WebSocketMultiplayerPeer.new()
-	
-	# Web版はHTTPSで配信されているため、WSS (Secure WebSocket) 必須
-	# 自己署名証明書のため verify_unsafe を使用
-	var url = "wss://" + server_ip + ":" + str(PORT)
+	var url = ""
+	if target_url != "":
+		url = target_url
+		print("Connecting to custom URL: ", url)
+	else:
+		# デフォルト動作
+		print("Auto-connecting to ", server_ip, ":", PORT)
+		# Web版はHTTPSで配信されているため、WSS (Secure WebSocket) 必須
+		# 自己署名証明書のため verify_unsafe を使用
+		url = "wss://" + server_ip + ":" + str(PORT)
+
+	var peer = WebSocketMultiplayerPeer.new()
 	var tls_options = TLSOptions.client_unsafe()
 	
 	var error = peer.create_client(url, tls_options)
