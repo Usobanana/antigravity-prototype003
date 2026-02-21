@@ -116,17 +116,17 @@ func _start_wave(wave_num):
 	current_state = WaveState.WAVE
 	
 	# ウェーブ進行による難易度上昇
-	# 敵の出現間隔を短くする（最小1.0秒）
-	enemy_timer.wait_time = max(1.0, 3.0 - (wave_num * 0.2))
+	# 敵の出現間隔を短くする
+	enemy_timer.wait_time = max(BalanceConfig.MIN_ENEMY_SPAWN_INTERVAL, BalanceConfig.BASE_ENEMY_SPAWN_INTERVAL - (wave_num * BalanceConfig.WAVE_DIFFICULTY_MULTIPLIER_STEP))
 	enemy_timer.start()
 	item_timer.start()
 	
-	# ウェーブ期間: 60秒
-	wave_timer.wait_time = 60.0
+	# ウェーブ期間
+	wave_timer.wait_time = BalanceConfig.WAVE_DURATION
 	wave_timer.start()
 	
 	# 全員にUI更新を通知
-	rpc("update_wave_ui", current_state, current_wave, 60.0)
+	rpc("update_wave_ui", current_state, current_wave, BalanceConfig.WAVE_DURATION)
 	print("Started WAVE ", current_wave)
 
 func _start_interval():
@@ -134,15 +134,13 @@ func _start_interval():
 	
 	# インターバル中は敵が出ない
 	enemy_timer.stop()
-	# アイテムは出るようにするかどうかは自由だが、今回は少しだけ出やすくする等でも良い。
-	# そのまましておく。
 	
-	# インターバル期間: 20秒
-	wave_timer.wait_time = 20.0
+	# インターバル期間
+	wave_timer.wait_time = BalanceConfig.INTERVAL_DURATION
 	wave_timer.start()
 	
 	# 全員にUI更新を通知
-	rpc("update_wave_ui", current_state, current_wave, 20.0)
+	rpc("update_wave_ui", current_state, current_wave, BalanceConfig.INTERVAL_DURATION)
 	print("Started INTERVAL after WAVE ", current_wave)
 
 func _on_wave_timer_timeout():
@@ -152,7 +150,7 @@ func _on_wave_timer_timeout():
 		_start_wave(current_wave + 1)
 
 @rpc("call_local")
-func update_wave_ui(state, wave_num, duration):
+func update_wave_ui(state, wave_num, _duration):
 	var ui_node = get_tree().current_scene.get_node_or_null("UI")
 	if not ui_node: return
 	var wave_label = ui_node.get_node_or_null("WaveLabel")
@@ -187,8 +185,8 @@ func _spawn_enemy():
 	elif r < 0.5:
 		type = "scout"
 		
-	enemy.initialize(type, wave_multiplier)
 	$Enemies.add_child(enemy, true)
+	enemy.initialize(type, wave_multiplier)
 
 # 敵の弾を発射する関数
 @rpc("any_peer", "call_local")
@@ -221,25 +219,12 @@ func _on_base_body_entered(body):
 		return
 		
 	if body.is_in_group("players"):
-		# 武器ボックスを持っているかチェック（held_itemsの仕組みとは別に管理するか、
-		# もしくはpickup時に判別フラグを持たせるか。今回は簡易的にpickup時に即時判定せず、
-		# 納品時に持っているアイテムの種類をチェックする必要があるが、
-		# 現在のpickup実装は単に数をカウントしているだけ。
-		# -> WeaponBoxはPickup時に「持ってるフラグ」をPlayerに立てるか、
-		#    あるいはWeaponBox自体をPlayerの子ノードとして物理的に持たせるのが本来だが、
-		#    今回は「held_items」カウント方式なので、WeaponBoxを拾った瞬間にフラグを立てる方式にする。
-		#    ただし、Playerスクリプトの改修が必要。
-		#    
-		#    代替案：WeaponBoxを拾うと、その場で「WeaponBoxアイテム」としてカウントしつつ、
-		#    Player側に「weapon_box_held = true」みたいなフラグを立てる。
-		
-		# Playerスクリプト改修前なので、ここでは「スコアによる納品」とは別に、
-		# 「武器ボックスを持っているなら解禁」という処理を入れる。
-		# そのためにPlayer.gdに `has_weapon_box` フラグを追加する必要がある。
-		
 		if "has_weapon_box" in body and body.has_weapon_box:
-			# 武器解禁通知（RPC）
-			body.rpc("unlock_weapon", "smg") # 今回はSMG固定
+			# サーバー側で永続データを直接更新
+			var pdm = get_node_or_null("/root/PlayerDataManager")
+			if pdm:
+				pdm.server_unlock_weapon(body.get_multiplayer_authority(), "smg")
+			
 			body.has_weapon_box = false
 			print("Weapon Unlocked: SMG for ", body.name)
 			
@@ -247,6 +232,11 @@ func _on_base_body_entered(body):
 			var points = body.held_items * 100
 			body.rpc("add_score", points)
 			print("Delivered! Score:", body.score + points)
+			
+			# スクラップ（スコア）を永続マテリアルとして即時サーバー側へ追加
+			var pdm = get_node_or_null("/root/PlayerDataManager")
+			if pdm:
+				pdm.server_add_materials(body.get_multiplayer_authority(), points)
 			
 			body.rpc("reset_carry")
 			rpc("spawn_delivery_effect", body.global_position)
@@ -275,13 +265,13 @@ func _on_item_spawn_timer_timeout():
 	else:
 		item = item_scene.instantiate()
 		# ウェーブ進行に応じてスクラップ（アイテム）の価値を上げる
-		# 基本score 100, ウェーブごとに+50。weightも少しずつ増やす(リスク増)
-		item.score = 100 + ((current_wave - 1) * 50)
-		item.weight = 1.0 + ((current_wave - 1) * 0.2)
+		item.score = BalanceConfig.BASE_ITEM_SCORE + ((current_wave - 1) * BalanceConfig.SCORE_INCREASE_PER_WAVE)
+		item.weight = BalanceConfig.BASE_ITEM_WEIGHT + ((current_wave - 1) * BalanceConfig.WEIGHT_INCREASE_PER_WAVE)
 		
 	var screen_size = Vector2(1152, 648)
 	item.position = Vector2(randf_range(50, screen_size.x - 50), randf_range(50, screen_size.y - 50))
 	if item.position.distance_to(Vector2(576, 324)) < 150:
+		item.queue_free()
 		return
 	$Items.add_child(item, true)
 

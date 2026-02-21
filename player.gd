@@ -44,6 +44,8 @@ var weapon_name = "Pistol"
 @export var health = 100
 var MAX_HEALTH = 100 
 
+var _footstep_timer = 0.0
+
 func _ready():
 	# PlayerDataManagerからステータス反映
 	var pdm = get_node_or_null("/root/PlayerDataManager")
@@ -154,6 +156,8 @@ func _physics_process(delta):
 	# クールダウン更新
 	if _fire_cooldown > 0:
 		_fire_cooldown -= delta
+	if _footstep_timer > 0:
+		_footstep_timer -= delta
 
 	# 「自分」のキャラクターだけがキー入力を受け付ける
 	if is_multiplayer_authority():
@@ -185,12 +189,25 @@ func _physics_process(delta):
 
 		# 重量による速度制限
 		var current_speed = SPEED
+		var weight_ratio = current_weight / max_carry_capacity
 		if current_weight > max_carry_capacity:
 			current_speed *= 0.5 # 50%減速
 
 		velocity = direction * current_speed
 		move_and_slide()
 		
+		# 足音の再生（移動中のみ）
+		if velocity.length() > 0:
+			# _footstep_timerは新しく追加する変数
+			if _footstep_timer <= 0:
+				# 足音の間隔（重いほど遅くしても良いが、今回は固定間隔0.4秒）
+				_footstep_timer = 0.4
+				# 重さに応じてピッチを下げる (1.0 -> 0.6)
+				var pitch = clamp(1.0 - (weight_ratio * 0.4), 0.6, 1.0)
+				AudioManager.play_se("footstep", pitch)
+		else:
+			_footstep_timer = 0.0
+
 
 		# 2. 右スティック（エイム＆攻撃）の処理
 		var use_mouse_aim = true
@@ -258,12 +275,17 @@ func start_reload():
 	rpc("set_reloading_state", true)
 	
 	# リロード完了待ち
-	await get_tree().create_timer(reload_time).timeout
-	
-	# 完了処理
-	current_ammo = max_ammo
-	rpc("set_reloading_state", false)
-	_update_weapon_hud()
+	var t = Timer.new()
+	t.wait_time = reload_time
+	t.one_shot = true
+	t.autostart = true
+	t.timeout.connect(func():
+		current_ammo = max_ammo
+		rpc("set_reloading_state", false)
+		_update_weapon_hud()
+		t.queue_free()
+	)
+	add_child(t)
 
 @rpc("call_local")
 func set_reloading_state(state):
@@ -352,14 +374,21 @@ func hit(damage):
 func _respawn_after_delay():
 	if is_peace_mode: return
 	
-	await get_tree().create_timer(3.0).timeout
-	health = MAX_HEALTH
-	# ランダムな位置にリスポーン
-	position = Vector2(randf_range(100, 700), randf_range(100, 500))
-	current_ammo = max_ammo # リスポーンで弾補充
-	is_reloading = false
-	rpc("set_reloading_state", false)
-	_update_weapon_hud()
+	var t = Timer.new()
+	t.wait_time = 3.0
+	t.one_shot = true
+	t.autostart = true
+	t.timeout.connect(func():
+		health = MAX_HEALTH
+		# ランダムな位置にリスポーン
+		position = Vector2(randf_range(100, 700), randf_range(100, 500))
+		current_ammo = max_ammo # リスポーンで弾補充
+		is_reloading = false
+		rpc("set_reloading_state", false)
+		_update_weapon_hud()
+		t.queue_free()
+	)
+	add_child(t)
 
 # アイテム取得（ローカル呼び出しだが、結果は同期変数を通じて伝播）
 func pickup(item_node):
@@ -478,8 +507,15 @@ func unlock_weapon(weapon_id):
 			label.modulate = Color(1, 1, 0)
 			label.position = Vector2(500, 100)
 			ui_node.add_child(label)
-			await get_tree().create_timer(3.0).timeout
-			label.queue_free()
+			var t = Timer.new()
+			t.wait_time = 3.0
+			t.one_shot = true
+			t.autostart = true
+			t.timeout.connect(func():
+				if is_instance_valid(label): label.queue_free()
+				t.queue_free()
+			)
+			ui_node.add_child(t)
 
 @rpc("any_peer", "call_local")
 func set_has_weapon_box_server(value):

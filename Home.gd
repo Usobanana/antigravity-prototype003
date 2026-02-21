@@ -263,18 +263,20 @@ func _refresh_lab_ui():
 
 func _upgrade_weight():
 	var pdm = get_node_or_null("/root/PlayerDataManager")
-	if pdm and pdm.upgrade_weight():
+	if pdm:
+		pdm.rpc_id(1, "request_upgrade", "weight")
+		# サーバーからのデータ受信後（非同期）にUIを更新させるため、少し待つか同期シグナルを待つ
+		# 今回は簡易的に0.5秒後にUI更新を試みる
+		await get_tree().create_timer(0.5).timeout
 		_refresh_lab_ui()
-		# Playerステータス即時反映
 		if player: player.max_carry_capacity = pdm.get_max_weight()
 
 func _upgrade_hp():
 	var pdm = get_node_or_null("/root/PlayerDataManager")
-	if pdm and pdm.upgrade_hp():
+	if pdm:
+		pdm.rpc_id(1, "request_upgrade", "hp")
+		await get_tree().create_timer(0.5).timeout
 		_refresh_lab_ui()
-		# Playerステータス即時反映（HP満タン化するかは選択だが、今回は最大値のみ更新）
-		# player.MAX_HEALTH 更新機能が必要だが、Player.gdが _ready で取得するだけなら再取得メソッドが必要
-		# とりあえず簡易的に
 		if player: 
 			player.MAX_HEALTH = pdm.get_max_hp()
 			player.health = player.MAX_HEALTH
@@ -285,14 +287,6 @@ func _toggle_armory_ui():
 	
 	ui.visible = not ui.visible
 	if ui.visible:
-		# Closeボタンの接続も確認
-		# ArmoryUIにはCloseBtnあったっけ？
-		# ArmoryUIの構造を確認すると、Panel直下にCloseBtnがないかも。
-		# Home.tscn の定義を見ると... ArmoryUIにはCloseBtnがない！
-		# 追加するか、ESCキー、あるいはトグルで閉じるか。
-		# 既存コードでは `_close_interaction_panel()` で InteractionPanel は閉じている。
-		# ArmoryUIを閉じる手段がないと詰む。
-		# 後でHome.tscnにArmoryUIのCloseBtnも足すべき。
 		_refresh_weapon_list()
 
 func _refresh_weapon_list():
@@ -323,8 +317,7 @@ func _refresh_weapon_list():
 		btn.pressed.connect(func(): _equip_weapon(w_id))
 		list_container.add_child(btn)
 		
-	# 閉じるボタン（簡易的にリストの最後に追加しておく？）
-	# いや、UI外クリックか、ArmoryUI内にCloseボタンを追加するのが筋。
+	# 閉じるボタン
 	var close_btn = Button.new()
 	close_btn.text = "CLOSE"
 	close_btn.pressed.connect(func(): get_node("UI/ArmoryUI").visible = false)
@@ -333,5 +326,6 @@ func _refresh_weapon_list():
 func _equip_weapon(weapon_id):
 	var pdm = get_node_or_null("/root/PlayerDataManager")
 	if pdm:
-		pdm.equip_weapon(weapon_id)
+		pdm.rpc_id(1, "request_equip_weapon", weapon_id)
+		await get_tree().create_timer(0.3).timeout
 		_refresh_weapon_list()

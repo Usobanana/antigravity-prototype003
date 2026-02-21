@@ -10,12 +10,11 @@ func _ready():
 		score_label.text = "Score: " + str(score)
 	
 	# スコアを素材に換算（例: 10%）
+	# （実際にはmain.gd側で即時付与済みなので、ここでは結果のみ表示する）
 	var earned_materials = int(score * 0.1)
 	materials_label.text = "Materials Earned: " + str(earned_materials)
 	
 	if earned_materials > 0:
-		# 保存
-		PlayerDataManager.add_materials(earned_materials)
 		_play_material_animation(earned_materials)
 	else:
 		$HomeButton.visible = true

@@ -66,14 +66,33 @@ const WEAPON_DB = {
 	}
 }
 
-# 永続化データ
+# --- Server Authoritative Data Storage ---
+const SERVER_DATA_FILE = "user://server_data.json"
+const CLIENT_TOKEN_FILE = "user://client_token.json"
+
+var my_token = ""
+var is_data_loaded = false
+
+# サーバー管理用の全プレイヤーデータ (辞書: token -> data)
+var server_players_data = {}
+
+# クライアント用の自身のデータキャッシュ（サーバーから同期される）
 var data = {
 	"materials": 0,
 	"max_weight_level": 0,
 	"hp_level": 0,
-	"weapons_unlocked": ["pistol", "smg", "shotgun", "sniper", "light_smg"],
+	"weapons_unlocked": ["pistol", "smg", "shotgun", "sniper", "light_smg"], # Default for testing
 	"equipped_weapon": "pistol"
 }
+
+func get_default_data() -> Dictionary:
+	return {
+		"materials": 0,
+		"max_weight_level": 0,
+		"hp_level": 0,
+		"weapons_unlocked": ["pistol", "smg", "shotgun", "sniper", "light_smg"],
+		"equipped_weapon": "pistol"
+	}
 
 # パラメータ設定
 const BASE_MAX_WEIGHT = 10.0
@@ -82,47 +101,113 @@ const BASE_MAX_HP = 100
 const HP_UPGRADE_AMOUNT = 20
 
 func _ready():
-	load_data()
-
-func save_data():
-	var file = FileAccess.open(SAVE_FILE, FileAccess.WRITE)
-	if file:
-		var json_str = JSON.stringify(data)
-		file.store_string(json_str)
-		print("Data saved.")
+	_ensure_my_token()
+	
+	if multiplayer.is_server():
+		_load_server_data()
+		# サーバーは定期的にオートセーブを実行
+		var save_timer = Timer.new()
+		save_timer.wait_time = 60.0 # 60秒ごと
+		save_timer.autostart = true
+		save_timer.timeout.connect(_save_server_data)
+		add_child(save_timer)
+		# 自身のデータを設定
+		_assign_server_data_to_self()
 	else:
-		print("Failed to save data.")
+		# クライアントは接続完了時にサーバーへデータ要求
+		multiplayer.connected_to_server.connect(_request_data_from_server)
 
-func load_data():
-	if not FileAccess.file_exists(SAVE_FILE):
-		print("No save file found. Creating new.")
-		save_data()
-		return
+# --- Client Authentication ---
+func _ensure_my_token():
+	if FileAccess.file_exists(CLIENT_TOKEN_FILE):
+		var file = FileAccess.open(CLIENT_TOKEN_FILE, FileAccess.READ)
+		my_token = file.get_as_text().strip_edges()
+	else:
+		# ランダムなUUIDを生成（簡易実装：乱数のハッシュ）
+		my_token = str(randi()).md5_text()
+		var file = FileAccess.open(CLIENT_TOKEN_FILE, FileAccess.WRITE)
+		file.store_string(my_token)
+	print("My Token: ", my_token)
 
-	var file = FileAccess.open(SAVE_FILE, FileAccess.READ)
-	if file:
-		var json_str = file.get_as_text()
+func _request_data_from_server():
+	rpc_id(1, "request_auth_and_data", my_token)
+
+# --- Server Data Management ---
+func _load_server_data():
+	if not multiplayer.is_server(): return
+	
+	if FileAccess.file_exists(SERVER_DATA_FILE):
+		var file = FileAccess.open(SERVER_DATA_FILE, FileAccess.READ)
 		var json = JSON.new()
-		var parse_result = json.parse(json_str)
-		if parse_result == OK:
-			# 既存セーブデータとデフォルトデータのマージ
-			for key in data.keys():
-				if json.data.has(key):
-					# weapons_unlockedの場合は配列をマージ（重複排除）
-					if key == "weapons_unlocked":
-						for w in json.data[key]:
-							if not w in data[key]:
-								data[key].append(w)
-					else:
-						data[key] = json.data[key]
-						
-			print("Data loaded and merged:", data)
+		if json.parse(file.get_as_text()) == OK:
+			server_players_data = json.data
+			print("Server data loaded.")
 		else:
-			print("JSON Parse Error: ", json.get_error_message())
+			print("Failed to parse server data.")
 
-func add_materials(amount: int):
-	data["materials"] += amount
-	save_data()
+func _save_server_data():
+	if not multiplayer.is_server(): return
+	var file = FileAccess.open(SERVER_DATA_FILE, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(server_players_data))
+		print("Server data auto-saved.")
+
+func _assign_server_data_to_self():
+	if not server_players_data.has(my_token):
+		server_players_data[my_token] = get_default_data()
+	data = server_players_data[my_token]
+	is_data_loaded = true
+
+# サーバー：クライアントからの認証とデータ要求を受け付ける
+@rpc("any_peer", "call_remote")
+func request_auth_and_data(token: String):
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	
+	if not server_players_data.has(token):
+		server_players_data[token] = get_default_data()
+		
+	# ※ 本格的な実装では、sender_id と token のマッピングをNetworkManagerに保存し、
+	# 以降のRPC検証に使用するべきですが、ここでは簡単のため省略
+	
+	if sender_id != 1:
+		rpc_id(sender_id, "receive_player_data", server_players_data[token])
+	else:
+		if token == my_token:
+			data = server_players_data[token]
+			is_data_loaded = true
+	print("Sent data to peer ", sender_id, " (Token: ", token.substr(0,8), ")")
+
+# クライアント：サーバーからデータを受け取る
+@rpc("authority", "call_remote")
+func receive_player_data(server_data: Dictionary):
+	data = server_data
+	is_data_loaded = true
+	print("Received latest data from server.")
+
+# --- Server Authoritative Actions ---
+# データの変更（add_materials等）は原則サーバー側で行い、クライアントに同期する
+# 以下の関数群は、サーバー上でのみ「本来のデータ（server_players_data）」を更新する
+
+# TODO: 今後利用する「特定のプレイヤーのデータを取得・更新する」ヘルパー
+func update_server_data(peer_id: int, token: String, mutator_func: Callable):
+	if not multiplayer.is_server(): return
+	if not server_players_data.has(token): return
+	
+	var user_data = server_players_data[token]
+	mutator_func.call(user_data)
+	server_players_data[token] = user_data
+	
+	if peer_id != 1:
+		rpc_id(peer_id, "receive_player_data", user_data)
+	
+	# もし自分がホストなら、ローカルのdataも更新
+	if peer_id == 1 and token == my_token:
+		data = user_data
+		is_data_loaded = true
+
+# --- Helper Methods (Client Cache Access) ---
+# これらのメソッドは「手元にあるキャッシュ」を読むだけに留める（画面表示等用）
 
 func get_materials() -> int:
 	return data.get("materials", 0)
@@ -135,34 +220,14 @@ func get_max_hp() -> int:
 	var level = data.get("hp_level", 0)
 	return BASE_MAX_HP + (level * HP_UPGRADE_AMOUNT)
 
-func upgrade_weight() -> bool:
-	var cost = get_upgrade_cost("weight")
-	if data["materials"] >= cost:
-		data["materials"] -= cost
-		data["max_weight_level"] += 1
-		save_data()
-		return true
-	return false
-
-func upgrade_hp() -> bool:
-	var cost = get_upgrade_cost("hp")
-	if data["materials"] >= cost:
-		data["materials"] -= cost
-		data["hp_level"] += 1
-		save_data()
-		return true
-	return false
-
 func get_upgrade_cost(type: String) -> int:
 	var level = 0
 	if type == "weight":
 		level = data.get("max_weight_level", 0)
 	elif type == "hp":
 		level = data.get("hp_level", 0)
-	
-	# コスト計算式: 基本コスト 100 + (レベル * 50)
-	# コスト計算式: 基本コスト 100 + (レベル * 50)
 	return 100 + (level * 50)
+
 
 # --- Weapon System ---
 
@@ -180,16 +245,66 @@ func is_weapon_unlocked(weapon_id: String) -> bool:
 	var unlocked = data.get("weapons_unlocked", ["pistol"])
 	return weapon_id in unlocked
 
-func unlock_weapon(weapon_id: String):
-	var unlocked = data.get("weapons_unlocked", ["pistol"])
-	if not weapon_id in unlocked:
-		unlocked.append(weapon_id)
-		data["weapons_unlocked"] = unlocked
-		save_data()
-		print("Weapon unlocked: ", weapon_id)
+# --- Server Action RPCs ---
+@rpc("any_peer", "call_local")
+func request_equip_weapon(weapon_id: String):
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = 1
+	var token = NetworkManager.get_token_for_peer(sender_id)
+	if token == "": return
+	
+	update_server_data(sender_id, token, func(user_data):
+		var unlocked = user_data.get("weapons_unlocked", ["pistol"])
+		if weapon_id in unlocked:
+			user_data["equipped_weapon"] = weapon_id
+			print("Server: Peer ", sender_id, " equipped ", weapon_id)
+	)
 
-func equip_weapon(weapon_id: String):
-	if is_weapon_unlocked(weapon_id):
-		data["equipped_weapon"] = weapon_id
-		save_data()
-		print("Weapon equipped: ", weapon_id)
+@rpc("any_peer", "call_local")
+func request_upgrade(upgrade_type: String):
+	if not multiplayer.is_server(): return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id == 0: sender_id = 1
+	var token = NetworkManager.get_token_for_peer(sender_id)
+	if token == "": return
+	
+	update_server_data(sender_id, token, func(user_data):
+		var materials = user_data.get("materials", 0)
+		var cost = 0
+		var level_key = ""
+		
+		if upgrade_type == "weight":
+			level_key = "max_weight_level"
+		elif upgrade_type == "hp":
+			level_key = "hp_level"
+		else:
+			return
+			
+		var level = user_data.get(level_key, 0)
+		cost = 100 + (level * 50)
+		
+		if materials >= cost:
+			user_data["materials"] = materials - cost
+			user_data[level_key] = level + 1
+			print("Server: Peer ", sender_id, " upgraded ", upgrade_type)
+	)
+
+# サーバー専用呼び出し（他スクリプトから）
+func server_add_materials(peer_id: int, amount: int):
+	var token = NetworkManager.get_token_for_peer(peer_id)
+	if token != "":
+		update_server_data(peer_id, token, func(user_data):
+			user_data["materials"] = user_data.get("materials", 0) + amount
+		)
+
+func server_unlock_weapon(peer_id: int, weapon_id: String):
+	var token = NetworkManager.get_token_for_peer(peer_id)
+	if token != "":
+		update_server_data(peer_id, token, func(user_data):
+			var unlocked = user_data.get("weapons_unlocked", ["pistol"])
+			if not weapon_id in unlocked:
+				unlocked.append(weapon_id)
+				user_data["weapons_unlocked"] = unlocked
+				print("Server: Peer ", peer_id, " unlocked ", weapon_id)
+		)

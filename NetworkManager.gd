@@ -13,6 +13,7 @@ var peer: WebSocketMultiplayerPeer
 
 # プレイヤー情報（ID: {score: 0, etc}）
 var players = {}
+var peer_tokens = {} # peer_id -> UUID token mapping
 var last_score = 0
 
 func _ready():
@@ -42,19 +43,18 @@ func try_auto_connect():
 		# デフォルト動作
 		print("Auto-connecting to ", server_ip, ":", PORT)
 		# Web版はHTTPSで配信されているため、WSS (Secure WebSocket) 必須
-		# 自己署名証明書のため verify_unsafe を使用
 		url = "wss://" + server_ip + ":" + str(PORT)
 
-	var peer = WebSocketMultiplayerPeer.new()
+	var p = WebSocketMultiplayerPeer.new()
 	var tls_options = TLSOptions.client_unsafe()
 	
-	var error = peer.create_client(url, tls_options)
+	var error = p.create_client(url, tls_options)
 	if error != OK:
 		print("Client creation failed.")
 		_try_start_host()
 		return
 	
-	multiplayer.multiplayer_peer = peer
+	multiplayer.multiplayer_peer = p
 
 func _try_start_host():
 	# Webエクスポートではサーバーになれないため、ホスト起動はスキップ
@@ -87,20 +87,44 @@ func _try_start_host():
 		return
 		
 	multiplayer.multiplayer_peer = peer
+	
+	# ホスト自身のトークンを登録
+	var pm = get_node_or_null("/root/PlayerDataManager")
+	if pm:
+		peer_tokens[1] = pm.my_token
+	
 	_on_connected_to_server() # ホスト自身も準備完了扱い
 	
 func _on_peer_connected(id):
 	print("Peer connected: ", id)
-	# プレイヤー情報の初期化など
 
 func _on_peer_disconnected(id):
 	print("Peer disconnected: ", id)
 	players.erase(id)
+	peer_tokens.erase(id)
 
 func _on_connected_to_server():
 	print("Connected to server!")
 	connection_established.emit()
-	# ホーム画面で「Connected」表示などに利用
+	
+	# ホスト以外のクライアントはUUIDをサーバーに送信
+	if not multiplayer.is_server():
+		var pm = get_node_or_null("/root/PlayerDataManager")
+		if pm:
+			rpc_id(1, "register_client_token", pm.my_token)
+
+@rpc("any_peer", "call_remote")
+func register_client_token(token: String):
+	if multiplayer.is_server():
+		var sender_id = multiplayer.get_remote_sender_id()
+		peer_tokens[sender_id] = token
+		print("Registered token for peer: ", sender_id)
+
+func get_token_for_peer(peer_id: int) -> String:
+	if peer_id == 1:
+		var pm = get_node_or_null("/root/PlayerDataManager")
+		return pm.my_token if pm else ""
+	return peer_tokens.get(peer_id, "")
 
 func _on_connection_failed():
 	print("Connection failed. Switching to Host mode...")
@@ -109,8 +133,9 @@ func _on_connection_failed():
 
 func _on_server_disconnected():
 	print("Server disconnected")
-	# タイトルに戻るなどの処理
-	get_tree().change_scene_to_file("res://Title.tscn")
+	# クライアントはタイトルに戻る
+	if not multiplayer.is_server():
+		get_tree().change_scene_to_file("res://Title.tscn")
 
 # ゲーム開始（シーン遷移）
 @rpc("any_peer", "call_local")
@@ -121,7 +146,12 @@ func start_game():
 # リザルト遷移
 @rpc("any_peer", "call_local")
 func end_game():
-	call_deferred("_change_scene", "res://Result.tscn")
+	if multiplayer.is_server():
+		# サーバーは少し待ってからホームへ戻る（クライアントがリザルトを見ている間に遷移指示）
+		# 本格的な専用サーバーなら Result を経由せず Home に戻すか、Result で待機させる
+		call_deferred("_change_scene", "res://Result.tscn")
+	else:
+		call_deferred("_change_scene", "res://Result.tscn")
 
 func _change_scene(path, emit_start_signal = false):
 	get_tree().change_scene_to_file(path)

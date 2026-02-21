@@ -4,11 +4,17 @@ var speed = 300.0
 var damage = 10
 var type = "normal" 
 
+var lifetime = 3.0
+
 func _ready():
-	await get_tree().create_timer(3.0).timeout
-	queue_free()
+	pass
 
 func _physics_process(delta):
+	lifetime -= delta
+	if lifetime <= 0:
+		queue_free()
+		return
+		
 	var direction = Vector2.RIGHT.rotated(rotation)
 	position += direction * speed * delta
 
