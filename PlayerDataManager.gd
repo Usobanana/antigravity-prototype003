@@ -13,6 +13,7 @@ const WEAPON_DB = {
 		"max_ammo": 12,
 		"reload_time": 1.5,
 		"icon_color": Color(0.6, 0.6, 0.6), # Grey
+		"type": "normal",
 		"description": "Standard issue sidearm."
 	},
 	"smg": {
@@ -24,7 +25,44 @@ const WEAPON_DB = {
 		"max_ammo": 30,
 		"reload_time": 2.5,
 		"icon_color": Color(0.2, 0.2, 0.8), # Blue
+		"type": "normal",
 		"description": "High rate of fire, low damage."
+	},
+	"shotgun": {
+		"name": "Shotgun",
+		"damage": 15,
+		"fire_rate": 0.8,
+		"bullet_speed": 350.0,
+		"weight": 6.0,
+		"max_ammo": 2,
+		"reload_time": 3.0,
+		"icon_color": Color(0.8, 0.4, 0.0), # Orange/Brown
+		"type": "spread",
+		"description": "Fires 5 pellets in a spread. Deadly at close range."
+	},
+	"sniper": {
+		"name": "Sniper Rifle",
+		"damage": 50,
+		"fire_rate": 1.5,
+		"bullet_speed": 1000.0,
+		"weight": 5.0,
+		"max_ammo": 1,
+		"reload_time": 3.0,
+		"icon_color": Color(0.1, 0.6, 0.1), # Dark Green
+		"type": "piercing",
+		"description": "High-velocity piercing rounds."
+	},
+	"light_smg": {
+		"name": "Light SMG",
+		"damage": 4,
+		"fire_rate": 0.08,
+		"bullet_speed": 450.0,
+		"weight": 0.5,
+		"max_ammo": 30,
+		"reload_time": 1.8,
+		"icon_color": Color(0.4, 0.8, 0.9), # Light Blue
+		"type": "normal",
+		"description": "Low damage, extremely light weight."
 	}
 }
 
@@ -33,7 +71,7 @@ var data = {
 	"materials": 0,
 	"max_weight_level": 0,
 	"hp_level": 0,
-	"weapons_unlocked": ["pistol"],
+	"weapons_unlocked": ["pistol", "smg", "shotgun", "sniper", "light_smg"],
 	"equipped_weapon": "pistol"
 }
 
@@ -67,8 +105,18 @@ func load_data():
 		var json = JSON.new()
 		var parse_result = json.parse(json_str)
 		if parse_result == OK:
-			data = json.data
-			print("Data loaded:", data)
+			# 既存セーブデータとデフォルトデータのマージ
+			for key in data.keys():
+				if json.data.has(key):
+					# weapons_unlockedの場合は配列をマージ（重複排除）
+					if key == "weapons_unlocked":
+						for w in json.data[key]:
+							if not w in data[key]:
+								data[key].append(w)
+					else:
+						data[key] = json.data[key]
+						
+			print("Data loaded and merged:", data)
 		else:
 			print("JSON Parse Error: ", json.get_error_message())
 

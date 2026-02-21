@@ -30,6 +30,7 @@ var fire_rate = 0.2 # デフォルト
 var bullet_speed = 400.0
 var weapon_damage = 10
 var weapon_weight = 0.0
+var weapon_type = "normal" # normal, spread, piercing
 
 # 弾薬・リロード
 var max_ammo = 12
@@ -57,6 +58,7 @@ func _ready():
 		bullet_speed = weapon_stats.get("bullet_speed", 400.0)
 		weapon_damage = weapon_stats.get("damage", 10)
 		weapon_weight = weapon_stats.get("weight", 0.0)
+		weapon_type = weapon_stats.get("type", "normal")
 		
 		max_ammo = weapon_stats.get("max_ammo", 12)
 		reload_time = weapon_stats.get("reload_time", 1.5)
@@ -228,10 +230,25 @@ func fire():
 		
 	_fire_cooldown = fire_rate
 	
-	if multiplayer.is_server():
-		get_node("/root/Main").fire_bullet(global_position, rotation, bullet_speed, weapon_damage)
+	if weapon_type == "spread":
+		# ショットガン：5発散弾
+		var pellet_count = 5
+		var spread_angle = deg_to_rad(30.0) # 全体の広がり角度(30度)
+		var start_angle = rotation - (spread_angle / 2.0)
+		var angle_step = spread_angle / float(pellet_count - 1)
+		
+		for i in range(pellet_count):
+			var current_angle = start_angle + (angle_step * i)
+			if multiplayer.is_server():
+				get_node("/root/Main").fire_bullet(global_position, current_angle, bullet_speed, weapon_damage, weapon_type)
+			else:
+				get_node("/root/Main").rpc_id(1, "fire_bullet", global_position, current_angle, bullet_speed, weapon_damage, weapon_type)
 	else:
-		get_node("/root/Main").rpc_id(1, "fire_bullet", global_position, rotation, bullet_speed, weapon_damage)
+		# 通常 / 貫通
+		if multiplayer.is_server():
+			get_node("/root/Main").fire_bullet(global_position, rotation, bullet_speed, weapon_damage, weapon_type)
+		else:
+			get_node("/root/Main").rpc_id(1, "fire_bullet", global_position, rotation, bullet_speed, weapon_damage, weapon_type)
 
 	if current_ammo <= 0:
 		start_reload()

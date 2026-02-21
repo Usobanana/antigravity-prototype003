@@ -5,24 +5,40 @@ const DEFAULT_SERVER_IP = "127.0.0.1"
 # プレイヤーの設計図を読み込んでおく
 @export var player_scene: PackedScene = preload("res://Player.tscn")
 @export var bullet_scene: PackedScene = preload("res://Bullet.tscn")
+@export var enemy_bullet_scene: PackedScene = preload("res://EnemyBullet.tscn")
 @export var enemy_scene: PackedScene = preload("res://Enemy.tscn")
 @export var item_scene: PackedScene = preload("res://Item.tscn")
+
+# ウェーブ管理
+enum WaveState { WAVE, INTERVAL }
+var current_state = WaveState.WAVE
+var current_wave = 1
+var wave_timer: Timer
+var enemy_timer: Timer
+var item_timer: Timer
 
 func _ready():
 	print("Main Scene Started")
 	
 	# ホストの場合のみ、ゲーム初期化処理
 	if multiplayer.is_server():
+		# ウェーブ管理タイマー
+		wave_timer = Timer.new()
+		wave_timer.autostart = false
+		wave_timer.one_shot = true
+		wave_timer.timeout.connect(_on_wave_timer_timeout)
+		add_child(wave_timer)
+		
 		# 敵・アイテム生成タイマー開始
-		var enemy_timer = Timer.new()
+		enemy_timer = Timer.new()
 		enemy_timer.wait_time = 3.0
-		enemy_timer.autostart = true
+		enemy_timer.autostart = false
 		enemy_timer.timeout.connect(_on_enemy_spawn_timer_timeout)
 		add_child(enemy_timer)
 
-		var item_timer = Timer.new()
+		item_timer = Timer.new()
 		item_timer.wait_time = 2.0
-		item_timer.autostart = true
+		item_timer.autostart = false
 		item_timer.timeout.connect(_on_item_spawn_timer_timeout)
 		add_child(item_timer)
 		
@@ -52,6 +68,10 @@ func _on_player_scene_ready():
 	if ready_players_count >= total_players:
 		print("All players ready. Spawning...")
 		_spawn_initial_players()
+		
+		# ホストのみウェーブ開始
+		if multiplayer.is_server():
+			_start_wave(1)
 
 func _spawn_initial_players():
 	_spawn_player(1)
@@ -86,23 +106,113 @@ func _remove_player(id):
 		get_node(str(id)).queue_free()
 
 func _on_enemy_spawn_timer_timeout():
-	_spawn_enemy()
+	if current_state == WaveState.WAVE:
+		_spawn_enemy()
+
+# --- Wave System Logic ---
+
+func _start_wave(wave_num):
+	current_wave = wave_num
+	current_state = WaveState.WAVE
+	
+	# ウェーブ進行による難易度上昇
+	# 敵の出現間隔を短くする（最小1.0秒）
+	enemy_timer.wait_time = max(1.0, 3.0 - (wave_num * 0.2))
+	enemy_timer.start()
+	item_timer.start()
+	
+	# ウェーブ期間: 60秒
+	wave_timer.wait_time = 60.0
+	wave_timer.start()
+	
+	# 全員にUI更新を通知
+	rpc("update_wave_ui", current_state, current_wave, 60.0)
+	print("Started WAVE ", current_wave)
+
+func _start_interval():
+	current_state = WaveState.INTERVAL
+	
+	# インターバル中は敵が出ない
+	enemy_timer.stop()
+	# アイテムは出るようにするかどうかは自由だが、今回は少しだけ出やすくする等でも良い。
+	# そのまましておく。
+	
+	# インターバル期間: 20秒
+	wave_timer.wait_time = 20.0
+	wave_timer.start()
+	
+	# 全員にUI更新を通知
+	rpc("update_wave_ui", current_state, current_wave, 20.0)
+	print("Started INTERVAL after WAVE ", current_wave)
+
+func _on_wave_timer_timeout():
+	if current_state == WaveState.WAVE:
+		_start_interval()
+	else:
+		_start_wave(current_wave + 1)
+
+@rpc("call_local")
+func update_wave_ui(state, wave_num, duration):
+	var ui_node = get_tree().current_scene.get_node_or_null("UI")
+	if not ui_node: return
+	var wave_label = ui_node.get_node_or_null("WaveLabel")
+	if not wave_label: return
+	
+	if state == WaveState.WAVE:
+		wave_label.text = "WAVE " + str(wave_num)
+		wave_label.modulate = Color(1, 0.2, 0.2) # Red-ish for combat
+	else:
+		wave_label.text = "INTERVAL - NEXT: WAVE " + str(wave_num + 1)
+		wave_label.modulate = Color(0.2, 1, 0.2) # Green-ish for safe time
+
+	# （オプション）残り時間を表示したい場合は _process で wave_timer.time_left を使う仕組みが必要。
+	# ここでは簡易的にフェーズ切り替え時にラベルが変わるだけにする。
+
+# -----------------------------
 
 func _spawn_enemy():
 	var enemy = enemy_scene.instantiate()
 	var screen_size = Vector2(1152, 648) # 簡易
 	enemy.global_position = Vector2(randf() * screen_size.x, randf() * screen_size.y)
+	
+	# ウェーブ進行による種類とステータスの決定
+	var wave_multiplier = 1.0 + ((current_wave - 1) * 0.2)
+	var type = "normal"
+	
+	var r = randf()
+	if current_wave >= 3 and r < 0.15:
+		type = "tank"
+	elif current_wave >= 2 and r < 0.35:
+		type = "shooter"
+	elif r < 0.5:
+		type = "scout"
+		
+	enemy.initialize(type, wave_multiplier)
 	$Enemies.add_child(enemy, true)
 
-# 弾を発射する関数
+# 敵の弾を発射する関数
+@rpc("any_peer", "call_local")
+func fire_enemy_bullet(pos, rot, speed=300.0, damage=10):
+	# サーバーのみが発射を許可（Enemy.gdはサーバーで動いているため）
+	if not multiplayer.is_server(): return
+	
+	var bullet = enemy_bullet_scene.instantiate()
+	bullet.global_position = pos
+	bullet.rotation = rot
+	bullet.speed = speed
+	bullet.damage = damage
+	$Projectiles.add_child(bullet, true)
+
 # 弾を発射する関数
 @rpc("any_peer", "call_local")
-func fire_bullet(pos, rot, speed=400.0, damage=10):
+func fire_bullet(pos, rot, speed=400.0, damage=10, type="normal"):
 	var bullet = bullet_scene.instantiate()
 	bullet.global_position = pos
 	bullet.rotation = rot
 	bullet.speed = speed
 	bullet.damage = damage
+	if "type" in bullet:
+		bullet.type = type
 	$Projectiles.add_child(bullet, true)
 
 	# Base納品処理
@@ -164,6 +274,10 @@ func _on_item_spawn_timer_timeout():
 		item = weapon_box_scene.instantiate()
 	else:
 		item = item_scene.instantiate()
+		# ウェーブ進行に応じてスクラップ（アイテム）の価値を上げる
+		# 基本score 100, ウェーブごとに+50。weightも少しずつ増やす(リスク増)
+		item.score = 100 + ((current_wave - 1) * 50)
+		item.weight = 1.0 + ((current_wave - 1) * 0.2)
 		
 	var screen_size = Vector2(1152, 648)
 	item.position = Vector2(randf_range(50, screen_size.x - 50), randf_range(50, screen_size.y - 50))

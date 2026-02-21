@@ -2,6 +2,7 @@ extends Area2D
 
 var speed = 400.0
 var damage = 10
+var type = "normal" # normal, spread, piercing
 
 func _ready():
 	await get_tree().create_timer(3.0).timeout
@@ -22,7 +23,8 @@ func _on_body_entered(body):
 		
 	if body.is_in_group("enemies"):
 		body.hit(damage)
-		queue_free()
+		if type != "piercing":
+			queue_free()
 	elif body.is_in_group("players"):
 		# PvPはなし？ありならここでhit
 		# 今回はなしとする
