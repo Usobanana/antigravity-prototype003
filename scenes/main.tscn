@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://bc4lm6557ad3v"]
 
-[ext_resource type="Script" uid="uid://47euvibq7h1u" path="res://main.gd" id="1_ig7tw"]
-[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://UI.tscn" id="2_ui"]
+[ext_resource type="Script" uid="uid://47euvibq7h1u" path="res://scripts/main.gd" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://scenes/UI.tscn" id="2_ui"]
 
-[ext_resource type="Script" path="res://GridBackground.gd" id="3_grid"]
+[ext_resource type="Script" path="res://scripts/GridBackground.gd" id="3_grid"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_base"]
 size = Vector2(100, 100)
@@ -22,19 +22,19 @@ script = ExtResource("3_grid")
 [node name="Projectiles" type="Node" parent="." unique_id=111111111]
 
 [node name="ProjectileSpawner" type="MultiplayerSpawner" parent="." unique_id=222222222]
-_spawnable_scenes = PackedStringArray("res://Bullet.tscn")
+_spawnable_scenes = PackedStringArray("res://scenes/Bullet.tscn")
 spawn_path = NodePath("../Projectiles")
 
 [node name="Enemies" type="Node" parent="." unique_id=333333333]
 
 [node name="EnemySpawner" type="MultiplayerSpawner" parent="." unique_id=444444444]
-_spawnable_scenes = PackedStringArray("res://Enemy.tscn")
+_spawnable_scenes = PackedStringArray("res://scenes/Enemy.tscn")
 spawn_path = NodePath("../Enemies")
 
 [node name="Items" type="Node" parent="." unique_id=555555555]
 
 [node name="ItemSpawner" type="MultiplayerSpawner" parent="." unique_id=666666666]
-_spawnable_scenes = PackedStringArray("res://Item.tscn", "res://WeaponBox.tscn")
+_spawnable_scenes = PackedStringArray("res://scenes/Item.tscn", "res://scenes/WeaponBox.tscn")
 spawn_path = NodePath("../Items")
 
 [node name="Base" type="Area2D" parent="."]
@@ -54,7 +54,7 @@ shape = SubResource("RectangleShape2D_base")
 [node name="UI" parent="." instance=ExtResource("2_ui")]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1067625345]
-_spawnable_scenes = PackedStringArray("res://Player.tscn")
+_spawnable_scenes = PackedStringArray("res://scenes/Player.tscn")
 spawn_path = NodePath("..")
 
 [connection signal="body_entered" from="Base" to="." method="_on_base_body_entered"]

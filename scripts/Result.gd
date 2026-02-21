@@ -45,4 +45,4 @@ func _play_material_animation(amount):
 func _on_home_button_pressed():
 	# ホームへ戻る（接続は維持）
 	# シーン遷移
-	get_tree().change_scene_to_file("res://Home.tscn")
+	get_tree().change_scene_to_file("res://scenes/Home.tscn")

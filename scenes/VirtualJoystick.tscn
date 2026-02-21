@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bteyn0hwlalqe"]
 
-[ext_resource type="Script" path="res://VirtualJoystick.gd" id="1_joystick"]
+[ext_resource type="Script" path="res://scripts/VirtualJoystick.gd" id="1_joystick"]
 
 [sub_resource type="Gradient" id="Gradient_base"]
 colors = PackedColorArray(0.2, 0.2, 0.2, 0.5, 0.2, 0.2, 0.2, 0.5)

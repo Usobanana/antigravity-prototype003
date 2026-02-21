@@ -22,4 +22,4 @@ func _on_start_button_pressed():
 		else:
 			NetworkManager.target_url = ""
 			
-	get_tree().change_scene_to_file("res://Home.tscn")
+	get_tree().change_scene_to_file("res://scenes/Home.tscn")

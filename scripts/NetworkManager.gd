@@ -135,13 +135,13 @@ func _on_server_disconnected():
 	print("Server disconnected")
 	# クライアントはタイトルに戻る
 	if not multiplayer.is_server():
-		get_tree().change_scene_to_file("res://Title.tscn")
+		get_tree().change_scene_to_file("res://scenes/Title.tscn")
 
 # ゲーム開始（シーン遷移）
 @rpc("any_peer", "call_local")
 func start_game():
 	# 物理演算中の呼び出しエラー回避のため deferred で実行
-	call_deferred("_change_scene", "res://main.tscn", true)
+	call_deferred("_change_scene", "res://scenes/main.tscn", true)
 
 # リザルト遷移
 @rpc("any_peer", "call_local")
@@ -149,9 +149,9 @@ func end_game():
 	if multiplayer.is_server():
 		# サーバーは少し待ってからホームへ戻る（クライアントがリザルトを見ている間に遷移指示）
 		# 本格的な専用サーバーなら Result を経由せず Home に戻すか、Result で待機させる
-		call_deferred("_change_scene", "res://Result.tscn")
+		call_deferred("_change_scene", "res://scenes/Result.tscn")
 	else:
-		call_deferred("_change_scene", "res://Result.tscn")
+		call_deferred("_change_scene", "res://scenes/Result.tscn")
 
 func _change_scene(path, emit_start_signal = false):
 	get_tree().change_scene_to_file(path)

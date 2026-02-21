@@ -11,18 +11,18 @@ config_version=5
 [application]
 
 config/name="antigravity-prototype003"
-run/main_scene="res://Title.tscn"
+run/main_scene="res://scenes/Title.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
-config/icon="res://icon.svg"
+config/icon="res://assets/icon.svg"
 
 [autoload]
 
-AudioManager="*res://AudioManager.gd"
-BalanceConfig="*res://BalanceConfig.gd"
-DebugTester="*res://DebugTester.gd"
-LogManager="*res://LogManager.gd"
-NetworkManager="*res://NetworkManager.gd"
-PlayerDataManager="*res://PlayerDataManager.gd"
+AudioManager="*res://scripts/AudioManager.gd"
+BalanceConfig="*res://scripts/BalanceConfig.gd"
+DebugTester="*res://scripts/DebugTester.gd"
+LogManager="*res://scripts/LogManager.gd"
+NetworkManager="*res://scripts/NetworkManager.gd"
+PlayerDataManager="*res://scripts/PlayerDataManager.gd"
 
 [display]
 

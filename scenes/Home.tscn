@@ -1,8 +1,8 @@
 [gd_scene load_steps=8 format=3 uid="uid://home_scene_id"]
 
-[ext_resource type="Script" path="res://Home.gd" id="1_home"]
-[ext_resource type="PackedScene" uid="uid://bir4iosflvg8m" path="res://Player.tscn" id="2_player"]
-[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://UI.tscn" id="3_ui"]
+[ext_resource type="Script" path="res://scripts/Home.gd" id="1_home"]
+[ext_resource type="PackedScene" uid="uid://bir4iosflvg8m" path="res://scenes/Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" uid="uid://uicontrol001" path="res://scenes/UI.tscn" id="3_ui"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wall"]
 size = Vector2(1200, 50)

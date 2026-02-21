@@ -3,11 +3,11 @@ extends Node2D
 const PORT = 7000
 const DEFAULT_SERVER_IP = "127.0.0.1"
 # プレイヤーの設計図を読み込んでおく
-@export var player_scene: PackedScene = preload("res://Player.tscn")
-@export var bullet_scene: PackedScene = preload("res://Bullet.tscn")
-@export var enemy_bullet_scene: PackedScene = preload("res://EnemyBullet.tscn")
-@export var enemy_scene: PackedScene = preload("res://Enemy.tscn")
-@export var item_scene: PackedScene = preload("res://Item.tscn")
+@export var player_scene: PackedScene = preload("res://scenes/Player.tscn")
+@export var bullet_scene: PackedScene = preload("res://scenes/Bullet.tscn")
+@export var enemy_bullet_scene: PackedScene = preload("res://scenes/EnemyBullet.tscn")
+@export var enemy_scene: PackedScene = preload("res://scenes/Enemy.tscn")
+@export var item_scene: PackedScene = preload("res://scenes/Item.tscn")
 
 # ウェーブ管理
 enum WaveState { WAVE, INTERVAL }
@@ -260,7 +260,7 @@ func _on_item_spawn_timer_timeout():
 	
 	if is_weapon_box:
 		# WeaponBox シーンをロード（変数定義が必要）
-		var weapon_box_scene = load("res://WeaponBox.tscn")
+		var weapon_box_scene = load("res://scenes/WeaponBox.tscn")
 		item = weapon_box_scene.instantiate()
 	else:
 		item = item_scene.instantiate()

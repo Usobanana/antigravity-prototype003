@@ -8,7 +8,7 @@ extends Node2D
 @onready var action_btn = $UI/InteractionPanel/ActionBtn
 
 # プレイヤー参照（ダイナミック生成）
-var player_scene = preload("res://Player.tscn")
+var player_scene = preload("res://scenes/Player.tscn")
 var player
 
 # インタラクション状態
