@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://dj8ks83gg15hr"]
+
+[ext_resource type="Script" path="res://player.gd" id="1_xhfnw"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
+size = Vector2(40, 40)
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_xhfnw"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:health")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:score")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:current_weight")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:held_items")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+
+[node name="Player" type="CharacterBody2D" unique_id=1447057567]
+script = ExtResource("1_xhfnw")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=108321858]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.96862745, 0.94509804, 0.81960785, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=601458956]
+shape = SubResource("RectangleShape2D_player")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1956617281]
+replication_config = SubResource("SceneReplicationConfig_xhfnw")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=259284307]
+enabled = false
+position_smoothing_enabled = true
+drag_horizontal_enabled = true
+drag_vertical_enabled = true
+
+[node name="ReloadBar" type="ProgressBar" parent="." unique_id=543567033]
+visible = false
+offset_left = -25.0
+offset_top = -40.0
+offset_right = 25.0
+offset_bottom = -35.0
+show_percentage = false
